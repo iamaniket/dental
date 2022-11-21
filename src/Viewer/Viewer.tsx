@@ -19,6 +19,8 @@ import { Scene } from "three/src/scenes/Scene";
 import { OrbitControls } from "../lib/OrbitControls.js";
 import { GLTFLoader } from "../lib/GLTFLoader";
 import RoomEnvironment from "../lib/RoomEnvironment.js";
+import { faRotate, faStop } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const loader = new GLTFLoader();
 
@@ -141,10 +143,17 @@ export class Viewer extends React.Component {
         <canvas id="viewer-3d" />
         <button
           className="float-button"
+          style={{
+            backgroundColor: this.state.allowRotation
+              ? "rgb(227, 227, 227)"
+              : "rgb(150, 150, 150)",
+          }}
           onClick={() => {
             this.setState({ allowRotation: !this.state.allowRotation });
           }}
-        ></button>
+        >
+          <FontAwesomeIcon icon={faRotate} />
+        </button>
       </>
     );
   }

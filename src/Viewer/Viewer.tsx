@@ -8,9 +8,14 @@ import React from "react";
 import {
   ACESFilmicToneMapping,
   Color,
+  Mesh,
+  MeshPhysicalMaterial,
   PerspectiveCamera,
   PMREMGenerator,
+  Raycaster,
+  SphereGeometry,
   sRGBEncoding,
+  Vector2,
 } from "three";
 import { Box3 } from "three/src/math/Box3";
 import { Vector3 } from "three/src/math/Vector3";
@@ -19,7 +24,7 @@ import { Scene } from "three/src/scenes/Scene";
 import { OrbitControls } from "../lib/OrbitControls.js";
 import { GLTFLoader } from "../lib/GLTFLoader";
 import RoomEnvironment from "../lib/RoomEnvironment.js";
-import { faRotate, faStop } from "@fortawesome/free-solid-svg-icons";
+import { faRotate } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const loader = new GLTFLoader();
@@ -30,10 +35,14 @@ export class Viewer extends React.Component {
   };
 
   renderer!: WebGLRenderer;
+  rayCaster!: Raycaster;
 
   camera: PerspectiveCamera;
   scene: Scene;
   controls: any;
+  pointer: Vector2;
+  mouseEvent: any;
+  inFoMesh: Array<Mesh>;
 
   constructor(props: {}) {
     super(props);
@@ -45,6 +54,9 @@ export class Viewer extends React.Component {
     );
     this.scene = new Scene();
     this.scene.background = new Color(0x777777);
+    this.rayCaster = new Raycaster();
+    this.pointer = new Vector2();
+    this.inFoMesh = [];
   }
 
   componentDidMount() {
@@ -55,6 +67,34 @@ export class Viewer extends React.Component {
       function (gltf: { scene: Scene }) {
         self.scene.add(gltf.scene);
         self.setIsoView();
+
+        const geometry = new SphereGeometry(0.05, 10, 16);
+        const material = new MeshPhysicalMaterial({
+          color: 0xffff00,
+          depthTest: false,
+        });
+        const info1 = new Mesh(geometry, material);
+
+        info1.name = "This is top of crown";
+        const info2 = new Mesh(geometry, material);
+        info2.name = "This is midle of crown";
+        const info3 = new Mesh(geometry, material);
+        info3.name = "This is bottom of crown";
+
+        const box3d = new Box3().setFromObject(gltf.scene);
+        info1.position.copy(
+          new Vector3(box3d.max.x / 2, box3d.max.y, box3d.max.z / 2)
+        );
+        info2.position.copy(
+          new Vector3(box3d.max.x / 2, box3d.min.y, box3d.max.z / 2)
+        );
+        info3.position.copy(
+          new Vector3(box3d.max.x / 2, box3d.max.y / 2, box3d.max.z / 2)
+        );
+        self.scene.add(info1);
+        self.scene.add(info2);
+        self.scene.add(info3);
+        self.inFoMesh = [info1, info2, info3];
       },
       function (xhr: ProgressEvent) {
         console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
@@ -97,6 +137,11 @@ export class Viewer extends React.Component {
     this.renderer.outputEncoding = sRGBEncoding;
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
+    window.addEventListener("pointermove", this.onPointerMove.bind(this));
+  }
+
+  onPointerMove(event: MouseEvent) {
+    this.mouseEvent = event;
   }
 
   onWindowResize() {
@@ -134,6 +179,39 @@ export class Viewer extends React.Component {
     this.controls.update();
     if (this.state.allowRotation)
       this.scene.rotation.y = this.scene.rotation.y + 0.01;
+
+    // calculate pointer position in normalized device coordinates
+    // (-1 to +1) for both components
+
+    if (this.mouseEvent) {
+      this.pointer.x = (this.mouseEvent.clientX / window.innerWidth) * 2 - 1;
+      this.pointer.y = -(this.mouseEvent.clientY / window.innerHeight) * 2 + 1;
+
+      this.rayCaster.setFromCamera(this.pointer, this.camera);
+      const intersects = this.rayCaster.intersectObjects(this.inFoMesh);
+
+      var element = document.getElementById("new");
+      if (element) {
+        while (element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+      }
+
+      if (intersects.length > 0) {
+        const { object } = intersects[0];
+        if (object) {
+          var tag = document.createElement("p");
+          var text = document.createTextNode(object.name);
+          tag.appendChild(text);
+          tag.style.position = "fixed";
+          tag.style.top = this.mouseEvent.clientY + "px";
+          tag.style.left = this.mouseEvent.clientX + "px";
+          tag.style.boxShadow = "0px 0px 5px 2px";
+          if (element) element.appendChild(tag);
+        }
+      }
+    }
+
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -154,6 +232,7 @@ export class Viewer extends React.Component {
         >
           <FontAwesomeIcon icon={faRotate} />
         </button>
+        <div id="new"></div>
       </>
     );
   }
